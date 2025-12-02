@@ -1,0 +1,162 @@
+{
+  "model_configs": {
+    "wav2vec2-base": {
+      "name": "facebook/wav2vec2-base",
+      "description": "Base model, ~95M parameters, good for 6GB GPU",
+      "gpu_memory_estimate": "~4-5GB with batch_size=8",
+      "recommended_batch_size": 8,
+      "recommended_max_duration": 5.0
+    },
+    "wav2vec2-large": {
+      "name": "facebook/wav2vec2-large",
+      "description": "Large model, ~317M parameters, requires >6GB GPU",
+      "gpu_memory_estimate": "~8-10GB with batch_size=4",
+      "recommended_batch_size": 4,
+      "recommended_max_duration": 3.0,
+      "note": "May not fit in 6GB GPU - use base model instead"
+    },
+    "hubert-base": {
+      "name": "facebook/hubert-base-ls960",
+      "description": "HuBERT base model, ~95M parameters",
+      "gpu_memory_estimate": "~4-5GB with batch_size=8",
+      "recommended_batch_size": 8,
+      "recommended_max_duration": 5.0
+    }
+  },
+
+  "training_configs": {
+    "quick_test": {
+      "description": "Quick test configuration",
+      "epochs": 3,
+      "batch_size": 8,
+      "learning_rate": 3e-5,
+      "warmup_ratio": 0.1,
+      "max_duration": 3.0,
+      "freeze_encoder": true
+    },
+    "standard": {
+      "description": "Standard training configuration for 6GB GPU",
+      "epochs": 15,
+      "batch_size": 8,
+      "learning_rate": 3e-5,
+      "warmup_ratio": 0.1,
+      "max_duration": 5.0,
+      "freeze_encoder": true
+    },
+    "full_finetune": {
+      "description": "Full model fine-tuning (requires more memory)",
+      "epochs": 20,
+      "batch_size": 4,
+      "learning_rate": 1e-5,
+      "warmup_ratio": 0.1,
+      "max_duration": 5.0,
+      "freeze_encoder": false,
+      "note": "May require gradient accumulation for 6GB GPU"
+    },
+    "multilingual_hindi": {
+      "description": "Multilingual training with Hindi dataset",
+      "epochs": 20,
+      "batch_size": 8,
+      "learning_rate": 3e-5,
+      "warmup_ratio": 0.15,
+      "max_duration": 5.0,
+      "freeze_encoder": true,
+      "include_hindi": true,
+      "emotions": ["angry", "happy", "neutral", "sad", "fear", "disgust"]
+    }
+  },
+
+  "dataset_configs": {
+    "english_only": {
+      "train_csv": [
+        "data/csv/train_ravdess.csv",
+        "data/csv/train_tess.csv"
+      ],
+      "test_csv": [
+        "data/csv/test_ravdess.csv",
+        "data/csv/test_tess.csv"
+      ],
+      "emotions": ["sad", "neutral", "happy"]
+    },
+    "english_extended": {
+      "train_csv": [
+        "data/csv/train_ravdess.csv",
+        "data/csv/train_tess.csv"
+      ],
+      "test_csv": [
+        "data/csv/test_ravdess.csv",
+        "data/csv/test_tess.csv"
+      ],
+      "emotions": ["angry", "sad", "neutral", "happy", "fear", "disgust"]
+    },
+    "multilingual": {
+      "train_csv": [
+        "data/csv/train_ravdess.csv",
+        "data/csv/train_tess.csv",
+        "data/csv/train_hindi.csv"
+      ],
+      "test_csv": [
+        "data/csv/test_ravdess.csv",
+        "data/csv/test_tess.csv",
+        "data/csv/test_hindi.csv"
+      ],
+      "emotions": ["angry", "happy", "neutral", "sad", "fear", "disgust"]
+    },
+    "hindi_only": {
+      "train_csv": [
+        "data/csv/train_hindi.csv"
+      ],
+      "test_csv": [
+        "data/csv/test_hindi.csv"
+      ],
+      "emotions": ["angry", "happy", "neutral", "sad", "fear", "disgust"]
+    }
+  },
+
+  "memory_optimization": {
+    "gradient_checkpointing": {
+      "enabled": true,
+      "description": "Saves memory by recomputing activations during backward pass"
+    },
+    "mixed_precision": {
+      "enabled": true,
+      "description": "Uses FP16 for faster training and reduced memory usage"
+    },
+    "freeze_feature_extractor": {
+      "enabled": true,
+      "description": "Freezes CNN layers to reduce trainable parameters"
+    },
+    "tips": [
+      "Start with batch_size=8, reduce to 4 if OOM",
+      "Use max_duration=5.0, reduce to 3.0 if OOM",
+      "Enable gradient checkpointing (always on)",
+      "Enable mixed precision training (FP16)",
+      "Freeze feature extractor for initial training",
+      "Monitor GPU memory with nvidia-smi",
+      "Use smaller model (wav2vec2-base) over large variants"
+    ]
+  },
+
+  "recommended_workflow": {
+    "step1": {
+      "description": "Generate Hindi CSV files",
+      "command": "python generate_hindi_csv.py"
+    },
+    "step2": {
+      "description": "Quick test (3 epochs, English only)",
+      "command": "python train_transformer.py --epochs 3 --batch_size 8"
+    },
+    "step3": {
+      "description": "Standard training (15 epochs, English datasets)",
+      "command": "python train_transformer.py --epochs 15 --batch_size 8 --emotions sad neutral happy"
+    },
+    "step4": {
+      "description": "Multilingual training with Hindi",
+      "command": "python train_transformer.py --epochs 20 --batch_size 8 --include_hindi --emotions angry happy neutral sad fear disgust"
+    },
+    "step5": {
+      "description": "Evaluate saved model",
+      "command": "python -c \"from transformer_emotion_recognition import TransformerEmotionRecognizer; r = TransformerEmotionRecognizer(['sad', 'neutral', 'happy']); r.load_model('models/transformer_best.pt'); print(r.evaluate())\""
+    }
+  }
+}
