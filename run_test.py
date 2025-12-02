@@ -43,5 +43,5 @@ print("\n6. Saving model...")
 rec.save_model('models/ravdess_tess_model.pkl')
 
 print("\n" + "=" * 60)
-print("  Setup Complete! ✓")
+print("  Setup Complete! [OK]")
 print("=" * 60)

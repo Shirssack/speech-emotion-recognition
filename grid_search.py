@@ -249,7 +249,7 @@ def main():
     optimizer.run_grid_search(models=models)
     
     best_name, _ = optimizer.get_best_model()
-    print(f"\n🏆 Best: {best_name} ({optimizer.results[best_name]['test_score']:.2%})")
+    print(f"\n[BEST] {best_name} ({optimizer.results[best_name]['test_score']:.2%})")
 
 
 if __name__ == "__main__":

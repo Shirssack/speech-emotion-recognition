@@ -16,9 +16,9 @@ files = [
 
 for f in files:
     if os.path.exists(f):
-        print(f"✓ {f}")
+        print(f"[OK] {f}")
     else:
-        print(f"✗ {f} - MISSING!")
+        print(f"[FAILED] {f} - MISSING!")
 
 print("\n--- Data folders ---")
 
@@ -34,6 +34,6 @@ for folder in data_folders:
         count = 0
         for root, dirs, files in os.walk(folder):
             count += len([f for f in files if f.endswith('.wav')])
-        print(f"✓ {folder}/ ({count} .wav files)")
+        print(f"[OK] {folder}/ ({count} .wav files)")
     else:
-        print(f"✗ {folder}/ - MISSING!")
+        print(f"[FAILED] {folder}/ - MISSING!")
