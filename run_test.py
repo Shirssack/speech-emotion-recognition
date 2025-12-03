@@ -8,10 +8,10 @@ print("=" * 60)
 print("  RAVDESS + TESS Setup Test")
 print("=" * 60)
 
-# Initialize with 3 emotions (fastest to test)
+# Initialize with 4 emotions
 print("\n1. Initializing EmotionRecognizer...")
 rec = EmotionRecognizer(
-    emotions=['happy', 'sad', 'neutral'],
+    emotions=['sad', 'neutral', 'happy', 'angry'],
     use_ravdess=True,
     use_tess=True,
     use_emodb=False,
