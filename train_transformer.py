@@ -38,16 +38,16 @@ def main():
 
     # Data arguments
     parser.add_argument('--train_csv', nargs='+',
-                        default=['data/csv/train_ravdess.csv', 'data/csv/train_tess.csv'],
-                        help='Training CSV files')
+                        default=['data/csv/train_ravdess_4class.csv', 'data/csv/train_tess_4class.csv'],
+                        help='Training CSV files (default: 4-class RAVDESS + TESS)')
     parser.add_argument('--test_csv', nargs='+',
-                        default=['data/csv/test_ravdess.csv', 'data/csv/test_tess.csv'],
-                        help='Testing CSV files')
+                        default=['data/csv/test_ravdess_4class.csv', 'data/csv/test_tess_4class.csv'],
+                        help='Testing CSV files (default: 4-class RAVDESS + TESS)')
     parser.add_argument('--include_hindi', action='store_true',
                         help='Include Hindi dataset for training')
     parser.add_argument('--emotions', nargs='+',
-                        default=['sad', 'neutral', 'happy'],
-                        help='Emotions to train on')
+                        default=['sad', 'neutral', 'happy', 'angry'],
+                        help='Emotions to train on (default: sad neutral happy angry)')
 
     # Model arguments
     parser.add_argument('--model_name', type=str,
@@ -82,10 +82,10 @@ def main():
 
     # Add Hindi dataset if requested
     if args.include_hindi:
-        if 'data/csv/train_hindi.csv' not in args.train_csv:
-            args.train_csv.append('data/csv/train_hindi.csv')
-        if 'data/csv/test_hindi.csv' not in args.test_csv:
-            args.test_csv.append('data/csv/test_hindi.csv')
+        if 'data/csv/train_hindi_4class.csv' not in args.train_csv:
+            args.train_csv.append('data/csv/train_hindi_4class.csv')
+        if 'data/csv/test_hindi_4class.csv' not in args.test_csv:
+            args.test_csv.append('data/csv/test_hindi_4class.csv')
         print("\n[Dataset] Including Hindi dataset for multilingual training")
 
     print("\n" + "="*70)

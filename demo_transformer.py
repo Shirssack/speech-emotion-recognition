@@ -25,7 +25,7 @@ from collections import Counter
 DEFAULT_MODEL_PATH = 'models/transformer_best.pt'
 
 # Emotions your model was trained on (MUST match training!)
-DEFAULT_EMOTIONS = ['sad', 'neutral', 'happy']
+DEFAULT_EMOTIONS = ['sad', 'neutral', 'happy', 'angry']
 
 # For single prediction mode
 DEFAULT_AUDIO_FILE = 'data/ravdess/Actor_01/03-01-01-01-01-01-01.wav'
@@ -309,7 +309,7 @@ Examples:
                         help=f'Path to trained model (default: {DEFAULT_MODEL_PATH})')
 
     parser.add_argument('--emotions', nargs='+', default=DEFAULT_EMOTIONS,
-                        help=f'Emotion labels (default: {" ".join(DEFAULT_EMOTIONS)})')
+                        help=f'Emotion labels - must match training (default: {" ".join(DEFAULT_EMOTIONS)})')
 
     parser.add_argument('--mode', type=str, choices=['info', 'single', 'batch'],
                         default=None, help='Demo mode (default: use quick demo)')

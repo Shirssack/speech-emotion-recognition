@@ -228,7 +228,8 @@ def load_best_estimators(emotions=['sad', 'neutral', 'happy']):
 
 def main():
     parser = argparse.ArgumentParser(description="Grid search for SER models")
-    parser.add_argument('--emotions', '-e', type=str, default='sad,neutral,happy')
+    parser.add_argument('--emotions', '-e', type=str, default='sad,neutral,happy,angry',
+                        help='Comma-separated list of emotions (default: sad,neutral,happy,angry)')
     parser.add_argument('--models', '-m', type=str, default=None)
     parser.add_argument('--fast', '-f', action='store_true')
     parser.add_argument('--cv', type=int, default=5)
