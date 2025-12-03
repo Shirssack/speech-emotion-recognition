@@ -58,15 +58,22 @@ python train_transformer.py \
     --model_name facebook/wav2vec2-base
 ```
 
-### 4. Train with Hindi Dataset (Multilingual)
+### 4. Train with All Datasets (Multilingual - Default)
 
 ```bash
-# Multilingual training with Hindi + English
+# Multilingual training with Hindi + English (default behavior)
 python train_transformer.py \
     --epochs 20 \
     --batch_size 8 \
-    --include_hindi \
-    --emotions angry happy neutral sad fear disgust
+    --emotions sad neutral happy angry
+```
+
+To exclude Hindi and use only English datasets:
+```bash
+python train_transformer.py \
+    --exclude_hindi \
+    --epochs 15 \
+    --batch_size 8
 ```
 
 ## Training Configurations
@@ -106,10 +113,10 @@ python train_transformer.py \
 ## Command-Line Arguments
 
 ### Data Arguments
-- `--train_csv`: Training CSV file(s) (default: RAVDESS + TESS)
-- `--test_csv`: Testing CSV file(s)
-- `--include_hindi`: Include Hindi dataset for multilingual training
-- `--emotions`: Emotions to train on (e.g., `sad neutral happy`)
+- `--train_csv`: Training CSV file(s) (default: RAVDESS + TESS + Hindi)
+- `--test_csv`: Testing CSV file(s) (default: RAVDESS + TESS + Hindi)
+- `--exclude_hindi`: Exclude Hindi dataset (use only English datasets)
+- `--emotions`: Emotions to train on (default: `sad neutral happy angry`)
 
 ### Model Arguments
 - `--model_name`: Pretrained model (default: `facebook/wav2vec2-base`)
@@ -149,12 +156,12 @@ python train_transformer.py \
     --batch_size 8
 ```
 
-### Example 3: Multilingual (English + Hindi)
+### Example 3: Multilingual (English + Hindi - Default)
 
 ```bash
+# Multilingual is now default, just train normally
 python train_transformer.py \
-    --include_hindi \
-    --emotions angry happy neutral sad fear disgust \
+    --emotions sad neutral happy angry \
     --epochs 20 \
     --batch_size 8 \
     --model_name_suffix multilingual
@@ -308,7 +315,7 @@ RuntimeError: CUDA out of memory
 2. Add more training data
 3. Try full fine-tuning (remove `--freeze_encoder`)
 4. Adjust learning rate: `--learning_rate 5e-5`
-5. Include Hindi dataset for more diversity: `--include_hindi`
+5. Hindi dataset is included by default for more diversity (use `--exclude_hindi` if not needed)
 
 ## Comparison: Traditional vs Transformer
 

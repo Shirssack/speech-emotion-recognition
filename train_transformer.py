@@ -38,13 +38,17 @@ def main():
 
     # Data arguments
     parser.add_argument('--train_csv', nargs='+',
-                        default=['data/csv/train_ravdess_4class.csv', 'data/csv/train_tess_4class.csv'],
-                        help='Training CSV files (default: 4-class RAVDESS + TESS)')
+                        default=['data/csv/train_ravdess_4class.csv',
+                                'data/csv/train_tess_4class.csv',
+                                'data/csv/train_hindi_4class.csv'],
+                        help='Training CSV files (default: 4-class RAVDESS + TESS + Hindi)')
     parser.add_argument('--test_csv', nargs='+',
-                        default=['data/csv/test_ravdess_4class.csv', 'data/csv/test_tess_4class.csv'],
-                        help='Testing CSV files (default: 4-class RAVDESS + TESS)')
-    parser.add_argument('--include_hindi', action='store_true',
-                        help='Include Hindi dataset for training')
+                        default=['data/csv/test_ravdess_4class.csv',
+                                'data/csv/test_tess_4class.csv',
+                                'data/csv/test_hindi_4class.csv'],
+                        help='Testing CSV files (default: 4-class RAVDESS + TESS + Hindi)')
+    parser.add_argument('--exclude_hindi', action='store_true',
+                        help='Exclude Hindi dataset (use only English datasets)')
     parser.add_argument('--emotions', nargs='+',
                         default=['sad', 'neutral', 'happy', 'angry'],
                         help='Emotions to train on (default: sad neutral happy angry)')
@@ -80,13 +84,15 @@ def main():
 
     args = parser.parse_args()
 
-    # Add Hindi dataset if requested
-    if args.include_hindi:
-        if 'data/csv/train_hindi_4class.csv' not in args.train_csv:
-            args.train_csv.append('data/csv/train_hindi_4class.csv')
-        if 'data/csv/test_hindi_4class.csv' not in args.test_csv:
-            args.test_csv.append('data/csv/test_hindi_4class.csv')
-        print("\n[Dataset] Including Hindi dataset for multilingual training")
+    # Remove Hindi dataset if excluded
+    if args.exclude_hindi:
+        if 'data/csv/train_hindi_4class.csv' in args.train_csv:
+            args.train_csv.remove('data/csv/train_hindi_4class.csv')
+        if 'data/csv/test_hindi_4class.csv' in args.test_csv:
+            args.test_csv.remove('data/csv/test_hindi_4class.csv')
+        print("\n[Dataset] Using English datasets only (RAVDESS + TESS)")
+    else:
+        print("\n[Dataset] Using multilingual datasets (RAVDESS + TESS + Hindi)")
 
     print("\n" + "="*70)
     print("TRANSFORMER-BASED EMOTION RECOGNITION TRAINING")

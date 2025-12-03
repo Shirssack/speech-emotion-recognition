@@ -18,19 +18,20 @@ Training scripts now use 4-class CSV files by default:
 
 ## Quick Start with 4 Emotions
 
-### Train Transformer Model (English only)
+### Train Transformer Model (Multilingual - Default)
 ```bash
 python train_transformer.py --epochs 15 --batch_size 8
 ```
 
 This automatically uses:
 - Emotions: `sad, neutral, happy, angry`
-- Training: `train_ravdess_4class.csv`, `train_tess_4class.csv`
-- Testing: `test_ravdess_4class.csv`, `test_tess_4class.csv`
+- Training: `train_ravdess_4class.csv`, `train_tess_4class.csv`, `train_hindi_4class.csv`
+- Testing: `test_ravdess_4class.csv`, `test_tess_4class.csv`, `test_hindi_4class.csv`
+- **Total samples**: ~3,094 train, ~777 test
 
-### Train with Hindi (Multilingual)
+### Train English Only (exclude Hindi)
 ```bash
-python train_transformer.py --include_hindi --epochs 20 --batch_size 8
+python train_transformer.py --exclude_hindi --epochs 15 --batch_size 8
 ```
 
 ### Demo/Prediction
