@@ -26,14 +26,17 @@ class EmotionRecognizer:
     
     def __init__(self, model=None, emotions=['sad', 'neutral', 'happy'],
                  features=['mfcc', 'chroma', 'mel'], balance=True,
-                 data_path='data', use_ravdess=True, use_tess=True, 
+                 data_path='data', use_ravdess=True, use_tess=True,
                  use_emodb=False, use_custom=False, use_hindi=False,
                  verbose=1):
         
         self.emotions = emotions
         self.features = features
         self.balance = balance
-        self.data_path = data_path
+
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        self.data_path = (data_path if os.path.isabs(data_path)
+                          else os.path.join(base_path, data_path))
         self.verbose = verbose
         
         self.use_ravdess = use_ravdess
@@ -153,9 +156,27 @@ class EmotionRecognizer:
         test_csvs = [c for c in test_csvs if os.path.exists(c)]
         
         if not train_csvs:
+            expected_dirs = []
+            if self.use_ravdess:
+                expected_dirs.append('ravdess')
+            if self.use_tess:
+                expected_dirs.append('tess')
+            if self.use_emodb:
+                expected_dirs.append('emodb')
+            if self.use_custom:
+                expected_dirs.append('custom')
+            if self.use_hindi:
+                expected_dirs.append('hindi')
+
+            dir_hints = ", ".join(os.path.join(self.data_path, d) for d in expected_dirs)
+            message = (
+                "No dataset found. Please add data to the 'data' folder or provide "
+                "the correct data_path. "
+                f"Checked: {dir_hints if dir_hints else self.data_path}."
+            )
             if self.verbose:
-                print("No dataset found. Please add data to the 'data' folder.")
-            return
+                print(message)
+            raise FileNotFoundError(message)
         
         extractor = AudioExtractor(
             audio_config=self.audio_config,
