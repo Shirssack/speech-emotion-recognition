@@ -30,8 +30,11 @@ if MODEL_TYPE == 'MLP':
         hidden_layer_sizes=(300,),
         activation='relu',
         solver='adam',
-        alpha=0.0001,
+        alpha=0.001,  # Increased regularization (was 0.0001)
         max_iter=500,
+        early_stopping=True,  # Stop when validation score stops improving
+        validation_fraction=0.1,
+        n_iter_no_change=10,
         random_state=42,
         verbose=True
     )
@@ -39,15 +42,18 @@ elif MODEL_TYPE == 'SVM':
     model = SVC(
         kernel='rbf',
         gamma='scale',
-        C=1.0,
+        C=1.0,  # Regularization parameter (lower = more regularization)
+        probability=True,  # Enable probability predictions
         random_state=42,
         verbose=True
     )
 elif MODEL_TYPE == 'RandomForest':
     model = RandomForestClassifier(
         n_estimators=100,
-        max_depth=None,
-        min_samples_split=2,
+        max_depth=15,  # Limit tree depth to reduce overfitting
+        min_samples_split=5,  # Increased from 2
+        min_samples_leaf=2,  # Minimum samples in leaf nodes
+        max_features='sqrt',  # Reduce features per split
         random_state=42,
         verbose=1,
         n_jobs=-1
@@ -57,13 +63,16 @@ elif MODEL_TYPE == 'GradientBoosting':
         n_estimators=100,
         learning_rate=0.1,
         max_depth=3,
+        min_samples_split=5,  # Increased regularization
+        subsample=0.8,  # Use 80% of samples for each tree
         random_state=42,
         verbose=1
     )
 elif MODEL_TYPE == 'KNN':
     model = KNeighborsClassifier(
-        n_neighbors=5,
+        n_neighbors=7,  # Increased from 5 for smoother decision boundary
         weights='distance',
+        metric='manhattan',  # Try manhattan distance
         n_jobs=-1
     )
 else:
@@ -132,8 +141,20 @@ print(cm)
 # Classification report
 print("\n[Classification Report]")
 from sklearn.metrics import classification_report, accuracy_score
-y_pred = rec.predict_batch(rec.X_test)
+y_pred = rec.model.predict(rec.X_test)  # Use model.predict directly
 print(classification_report(rec.y_test, y_pred, target_names=EMOTIONS))
+
+# Check for overfitting
+print("\n[Overfitting Check]")
+if train_acc - test_acc > 0.15:  # More than 15% gap
+    print(f"⚠ WARNING: Possible overfitting detected!")
+    print(f"   Train-Test gap: {(train_acc - test_acc):.2%}")
+    print(f"   Consider: reducing model complexity or adding regularization")
+elif train_acc - test_acc > 0.10:  # 10-15% gap
+    print(f"ℹ Moderate train-test gap: {(train_acc - test_acc):.2%}")
+    print(f"   Model may be slightly overfitting")
+else:
+    print(f"✓ Good generalization (gap: {(train_acc - test_acc):.2%})")
 
 # Save model
 os.makedirs('models', exist_ok=True)
