@@ -5,7 +5,6 @@ Quick training script for LSTM and GRU neural networks.
 
 from deep_emotion_recognition import DeepEmotionRecognizer
 from data_extractor import load_data
-from sklearn.preprocessing import StandardScaler
 import numpy as np
 import os
 
@@ -53,23 +52,34 @@ print(f"\n  Training samples: {len(X_train)}")
 print(f"  Test samples: {len(X_test)}")
 print(f"  Feature dimensions: {X_train.shape[1]}")
 
-# Create recognizer (with automatic data loading disabled)
+# Create recognizer using a dummy data_path that doesn't interfere
 print(f"\n[2/4] Creating {MODEL_TYPE} recognizer...")
-rec = DeepEmotionRecognizer(
-    emotions=EMOTIONS,
-    n_rnn_layers=NUM_LAYERS,
-    rnn_units=HIDDEN_SIZE,
-    dropout=DROPOUT,
-    cell_type=MODEL_TYPE,
-    use_ravdess=False,  # Disable auto-loading since we loaded manually
-    use_tess=False,
-    use_hindi=False,
-    verbose=1
-)
+try:
+    # Try with disabled flags first
+    rec = DeepEmotionRecognizer(
+        emotions=EMOTIONS,
+        n_rnn_layers=NUM_LAYERS,
+        rnn_units=HIDDEN_SIZE,
+        dropout=DROPOUT,
+        cell_type=MODEL_TYPE,
+        use_ravdess=False,
+        use_tess=False,
+        use_hindi=False,
+        data_path='__nonexistent__',  # Use non-existent path to skip auto-loading
+        verbose=0  # Suppress "No dataset found" message
+    )
+except:
+    # If that fails, create with default settings and override data
+    rec = DeepEmotionRecognizer(
+        emotions=EMOTIONS,
+        n_rnn_layers=NUM_LAYERS,
+        rnn_units=HIDDEN_SIZE,
+        dropout=DROPOUT,
+        cell_type=MODEL_TYPE,
+        verbose=0
+    )
 
 # Manually set the loaded data to the recognizer
-# The recognizer's _prepare_data() didn't load anything because all use_ flags are False
-# So we need to manually assign the data
 rec.X_train = X_train
 rec.y_train = y_train
 rec.X_test = X_test
@@ -82,9 +92,11 @@ rec.X_test = rec.scaler.transform(rec.X_test)
 # Rebuild the model with correct input shape
 rec._build_model()
 
+print(f"  Model created successfully with {MODEL_TYPE} architecture")
+
 # Train
 print(f"\n[3/4] Training {MODEL_TYPE} model...")
-print(f"  This may take 5-15 minutes depending on your hardware...\n")
+print(f"  This may take 10-30 minutes depending on your hardware...\n")
 
 history = rec.train(epochs=EPOCHS, batch_size=BATCH_SIZE, validation_split=0.1)
 
@@ -98,6 +110,19 @@ print("RESULTS")
 print("="*70)
 print(f"  Training Accuracy: {train_acc:.2%}")
 print(f"  Test Accuracy: {test_acc:.2%}")
+
+# Check for overfitting
+print("\n[Overfitting Check]")
+gap = train_acc - test_acc
+if gap > 0.15:
+    print(f"⚠ WARNING: Possible overfitting detected!")
+    print(f"   Train-Test gap: {gap:.2%}")
+    print(f"   Consider: increasing dropout, reducing model size, or training longer")
+elif gap > 0.10:
+    print(f"ℹ Moderate train-test gap: {gap:.2%}")
+    print(f"   Model may be slightly overfitting")
+else:
+    print(f"✓ Good generalization (gap: {gap:.2%})")
 
 # Get predictions for confusion matrix
 X_test_rnn = rec._prepare_data_for_rnn(rec.X_test)

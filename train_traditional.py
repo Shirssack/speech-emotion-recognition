@@ -98,15 +98,26 @@ print(f"  Feature dimensions: {X_train.shape[1]}")
 
 # Create recognizer with the model
 print(f"\n[3/5] Creating recognizer with {MODEL_TYPE}...")
-rec = EmotionRecognizer(
-    model=model,
-    emotions=EMOTIONS,
-    use_ravdess=False,  # Disable auto-loading since we loaded manually
-    use_tess=False,
-    use_hindi=False,
-    balance=True,
-    verbose=1
-)
+try:
+    # Try with disabled flags first
+    rec = EmotionRecognizer(
+        model=model,
+        emotions=EMOTIONS,
+        use_ravdess=False,
+        use_tess=False,
+        use_hindi=False,
+        data_path='__nonexistent__',  # Use non-existent path to skip auto-loading
+        balance=True,
+        verbose=0  # Suppress "No dataset found" message
+    )
+except:
+    # If that fails, create with default settings and override data
+    rec = EmotionRecognizer(
+        model=model,
+        emotions=EMOTIONS,
+        balance=True,
+        verbose=0
+    )
 
 # Manually set the loaded data
 rec.X_train = X_train
@@ -117,6 +128,8 @@ rec.y_test = y_test
 # Scale the data
 rec.X_train = rec.scaler.fit_transform(rec.X_train)
 rec.X_test = rec.scaler.transform(rec.X_test)
+
+print(f"  Recognizer created successfully with {MODEL_TYPE}")
 
 # Train
 print(f"\n[4/5] Training {MODEL_TYPE} model...")
