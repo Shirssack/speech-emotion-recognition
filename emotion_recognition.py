@@ -34,9 +34,27 @@ class EmotionRecognizer:
         self.features = features
         self.balance = balance
 
+        # Resolve data_path robustly so users can point to datasets regardless of
+        # their working directory.
+        expanded_path = os.path.expanduser(os.path.expandvars(data_path))
         base_path = os.path.dirname(os.path.abspath(__file__))
-        self.data_path = (data_path if os.path.isabs(data_path)
-                          else os.path.join(base_path, data_path))
+
+        if os.path.isabs(expanded_path):
+            resolved_path = expanded_path
+        else:
+            project_default = os.path.join(base_path, expanded_path)
+            cwd_candidate = os.path.abspath(expanded_path)
+
+            if os.path.exists(project_default):
+                resolved_path = project_default
+            elif os.path.exists(cwd_candidate):
+                resolved_path = cwd_candidate
+            else:
+                # Fall back to the project-relative location even if it does not
+                # exist yet so downstream messaging reflects that path.
+                resolved_path = project_default
+
+        self.data_path = resolved_path
         self.verbose = verbose
         
         self.use_ravdess = use_ravdess
@@ -52,6 +70,12 @@ class EmotionRecognizer:
             'contrast': 'contrast' in features,
             'tonnetz': 'tonnetz' in features
         }
+
+        self._base_paths = []
+        for candidate in (os.getcwd(), base_path, self.data_path):
+            abs_candidate = os.path.abspath(candidate)
+            if abs_candidate not in self._base_paths:
+                self._base_paths.append(abs_candidate)
         
         if model is None:
             self.model = MLPClassifier(
@@ -87,85 +111,111 @@ class EmotionRecognizer:
         csv_folder = os.path.join(self.data_path, 'csv')
         os.makedirs(csv_folder, exist_ok=True)
         
-        if self.use_ravdess:
-            ravdess_path = os.path.join(self.data_path, 'ravdess')
-            if os.path.exists(ravdess_path):
-                train_csv = os.path.join(csv_folder, 'train_ravdess.csv')
-                test_csv = os.path.join(csv_folder, 'test_ravdess.csv')
-                
-                if not os.path.exists(train_csv):
-                    write_ravdess_csv(ravdess_path, self.emotions, 
-                                     train_csv, test_csv, verbose=self.verbose)
-                
+        def add_dataset(dataset_path, train_name, test_name, writer_fn):
+            train_csv = os.path.join(csv_folder, train_name)
+            test_csv = os.path.join(csv_folder, test_name)
+
+            if os.path.exists(train_csv) and os.path.exists(test_csv):
                 train_csvs.append(train_csv)
                 test_csvs.append(test_csv)
+                return True
+
+            if os.path.exists(dataset_path):
+                if not os.path.exists(train_csv):
+                    writer_fn(dataset_path, self.emotions,
+                              train_csv, test_csv, verbose=self.verbose)
+
+                if os.path.exists(train_csv):
+                    train_csvs.append(train_csv)
+                if os.path.exists(test_csv):
+                    test_csvs.append(test_csv)
+                return True
+
+            return False
+
+        if self.use_ravdess:
+            ravdess_path = os.path.join(self.data_path, 'ravdess')
+            add_dataset(ravdess_path, 'train_ravdess.csv', 'test_ravdess.csv', write_ravdess_csv)
         
         if self.use_tess:
             tess_path = os.path.join(self.data_path, 'tess')
-            if os.path.exists(tess_path):
-                train_csv = os.path.join(csv_folder, 'train_tess.csv')
-                test_csv = os.path.join(csv_folder, 'test_tess.csv')
-                
-                if not os.path.exists(train_csv):
-                    write_tess_csv(tess_path, self.emotions,
-                                  train_csv, test_csv, verbose=self.verbose)
-                
-                train_csvs.append(train_csv)
-                test_csvs.append(test_csv)
+            add_dataset(tess_path, 'train_tess.csv', 'test_tess.csv', write_tess_csv)
         
         if self.use_emodb:
             emodb_path = os.path.join(self.data_path, 'emodb')
-            if os.path.exists(emodb_path):
-                train_csv = os.path.join(csv_folder, 'train_emodb.csv')
-                test_csv = os.path.join(csv_folder, 'test_emodb.csv')
-                
-                if not os.path.exists(train_csv):
-                    write_emodb_csv(emodb_path, self.emotions,
-                                   train_csv, test_csv, verbose=self.verbose)
-                
-                train_csvs.append(train_csv)
-                test_csvs.append(test_csv)
+            add_dataset(emodb_path, 'train_emodb.csv', 'test_emodb.csv', write_emodb_csv)
         
         if self.use_custom:
             custom_path = os.path.join(self.data_path, 'custom')
-            if os.path.exists(custom_path):
-                train_csv = os.path.join(csv_folder, 'train_custom.csv')
-                test_csv = os.path.join(csv_folder, 'test_custom.csv')
-                
-                if not os.path.exists(train_csv):
-                    write_custom_csv(custom_path, self.emotions,
-                                    train_csv, test_csv, verbose=self.verbose)
-                
-                train_csvs.append(train_csv)
-                test_csvs.append(test_csv)
+            add_dataset(custom_path, 'train_custom.csv', 'test_custom.csv', write_custom_csv)
         
         if self.use_hindi:
             hindi_path = os.path.join(self.data_path, 'hindi')
-            if os.path.exists(hindi_path):
-                train_csv = os.path.join(csv_folder, 'train_hindi.csv')
-                test_csv = os.path.join(csv_folder, 'test_hindi.csv')
-                
-                if not os.path.exists(train_csv):
-                    write_hindi_csv(hindi_path, self.emotions,
-                                   train_csv, test_csv, verbose=self.verbose)
-                
-                train_csvs.append(train_csv)
-                test_csvs.append(test_csv)
+            add_dataset(hindi_path, 'train_hindi.csv', 'test_hindi.csv', write_hindi_csv)
         
         train_csvs = [c for c in train_csvs if os.path.exists(c)]
         test_csvs = [c for c in test_csvs if os.path.exists(c)]
-        
-        if not train_csvs:
-            message = ("No dataset found. Please add data to the 'data' folder "
-                       "or provide the correct data_path.")
+
+        enabled_sources = {
+            'ravdess': self.use_ravdess,
+            'tess': self.use_tess,
+            'emodb': self.use_emodb,
+            'custom': self.use_custom,
+            'hindi': self.use_hindi,
+        }
+
+        if not any(enabled_sources.values()):
+            message = (
+                "No datasets are enabled.\n"
+                "Turn on at least one source (e.g., use_ravdess=True or use_custom=True).\n"
+                f"Current data_path: {os.path.abspath(self.data_path)}\n"
+                "If your data is elsewhere, pass data_path='/absolute/path/to/data' when creating the recognizer."
+            )
+
             if self.verbose:
                 print(message)
+
+            raise ValueError(message)
+
+        if not train_csvs:
+            resolved_data_path = os.path.abspath(self.data_path)
+            expected_sources = []
+
+            if self.use_ravdess:
+                expected_sources.append(os.path.join(resolved_data_path, 'ravdess'))
+            if self.use_tess:
+                expected_sources.append(os.path.join(resolved_data_path, 'tess'))
+            if self.use_emodb:
+                expected_sources.append(os.path.join(resolved_data_path, 'emodb'))
+            if self.use_custom:
+                expected_sources.append(os.path.join(resolved_data_path, 'custom'))
+            if self.use_hindi:
+                expected_sources.append(os.path.join(resolved_data_path, 'hindi'))
+
+            expected_str = '\n  - '.join(expected_sources)
+            csv_hint = os.path.join(resolved_data_path, 'csv')
+            message = (
+                "No dataset found for the enabled sources.\n"
+                f"Checked data_path: {resolved_data_path}\n"
+                f"Expected folders or CSVs in: {csv_hint}\n"
+                f"Expected folders:\n  - {expected_str}\n\n"
+                "Fixes:\n"
+                "  1) Download the datasets into the folders above (see README > Datasets).\n"
+                "  2) Place train/test CSVs in the csv/ folder if you already generated them.\n"
+                "  3) Pass data_path='/absolute/path/to/data' when creating the recognizer.\n"
+                "  4) Disable sources you do not have (e.g., use_ravdess=False, use_tess=False)."
+            )
+
+            if self.verbose:
+                print(message)
+
             raise FileNotFoundError(message)
         
         extractor = AudioExtractor(
             audio_config=self.audio_config,
             emotions=self.emotions,
             balance=self.balance,
+            base_paths=self._base_paths,
             verbose=self.verbose
         )
         

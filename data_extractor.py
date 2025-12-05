@@ -17,7 +17,7 @@ class AudioExtractor:
     """Main class for extracting and managing audio features."""
     
     def __init__(self, audio_config=None, classification=True, emotions=['sad', 'neutral', 'happy'],
-                 balance=True, features_folder='features', verbose=1):
+                 balance=True, features_folder='features', base_paths=None, verbose=1):
         
         self.audio_config = audio_config or {
             'mfcc': True,
@@ -31,6 +31,7 @@ class AudioExtractor:
         self.emotions = emotions
         self.balance = balance
         self.features_folder = features_folder
+        self.base_paths = [os.path.abspath(p) for p in (base_paths or [os.getcwd()])]
         self.verbose = verbose
         
         self.feature_length = get_feature_vector_length(**self.audio_config)
@@ -129,14 +130,16 @@ class AudioExtractor:
         for _, row in iterator:
             audio_path = row['path']
             emotion = row['emotion']
-            
+
+            resolved_path = self._resolve_audio_path(audio_path)
+
             try:
-                feature_vector = extract_feature(audio_path, **self.audio_config)
-                
+                feature_vector = extract_feature(resolved_path, **self.audio_config)
+
                 if feature_vector is not None and len(feature_vector) == self.feature_length:
                     features.append(feature_vector)
                     labels.append(emotion)
-                    paths.append(audio_path)
+                    paths.append(resolved_path)
                 else:
                     errors += 1
                     
@@ -145,8 +148,26 @@ class AudioExtractor:
         
         if self.verbose and errors > 0:
             print(f"  {errors} files failed to process")
-        
+
         return np.array(features), np.array(labels), np.array(paths)
+
+    def _resolve_audio_path(self, audio_path):
+        expanded = os.path.expanduser(os.path.expandvars(str(audio_path)))
+
+        if os.path.isabs(expanded) and os.path.exists(expanded):
+            return expanded
+
+        for base in self.base_paths:
+            candidate = os.path.abspath(os.path.join(base, expanded))
+            if os.path.exists(candidate):
+                return candidate
+
+        # fall back to the first base even if the file is missing so the caller sees
+        # a consistent absolute path in any downstream errors
+        if self.base_paths:
+            return os.path.abspath(os.path.join(self.base_paths[0], expanded))
+
+        return os.path.abspath(expanded)
     
     def _balance_data(self):
         if self.verbose:

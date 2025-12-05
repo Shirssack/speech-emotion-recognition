@@ -238,6 +238,47 @@ python demo_transformer.py --mode info
 
 **Train/Test Split**: 80% training (3,094 samples) / 20% testing (777 samples)
 
+### Setting Up Datasets Locally
+
+Place the raw audio folders inside a single `data/` directory (default). The
+project looks for the following structure:
+
+```
+speech-emotion-recognition/
+  data/
+    ravdess/   # RAVDESS WAV files
+    tess/      # TESS WAV files
+    emodb/     # (optional) Emo-DB WAV files
+    hindi/     # (optional) Hindi dataset WAV files
+    custom/    # (optional) Your own dataset
+```
+
+If your data lives elsewhere, point the library to it:
+
+```python
+from emotion_recognition import EmotionRecognizer
+
+rec = EmotionRecognizer(data_path="/absolute/path/to/my_data")
+```
+
+Relative paths are resolved intelligently:
+
+- If `data/` exists next to the code (project default), it will be used.
+- Otherwise, a relative `data_path` will fall back to the current working
+  directory so you can keep datasets outside the repository without changing
+  code paths.
+- If you already generated CSVs (e.g., `data/csv/train_ravdess.csv`), they will
+  be used automatically even when the raw folders are unavailable; relative
+  `path` entries inside those CSVs will be expanded against the resolved
+  `data_path` or the project root so that audio files are found reliably.
+
+Alternatively, disable sources you do not have (e.g., `use_ravdess=False`) to
+avoid looking for missing folders.
+
+> **Tip:** At least one dataset flag must be enabled (`use_ravdess`, `use_tess`,
+> `use_emodb`, `use_custom`, or `use_hindi`). If all are `False`, dataset
+> preparation will stop with an error asking you to enable a source.
+
 ---
 
 ## 🤖 Model Types
@@ -663,6 +704,21 @@ pip install -r requirements.txt --upgrade
 # Check Python version
 python --version  # Should be 3.8+
 ```
+
+### Dataset Not Found
+
+If you see an error like `No dataset found for the enabled sources`:
+
+1. Make sure the `data/` directory contains the dataset folders you enabled
+   (e.g., `ravdess/`, `tess/`, `hindi/`).
+2. If your data is stored elsewhere, pass an absolute path when creating the
+   recognizer, for example:
+
+   ```python
+   rec = EmotionRecognizer(data_path="D:/datasets/speech")
+   ```
+
+3. Disable datasets you do not have (e.g., `use_ravdess=False`, `use_tess=False`).
 
 ---
 
