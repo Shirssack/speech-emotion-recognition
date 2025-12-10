@@ -1,15 +1,17 @@
 """
 train_traditional.py - Train traditional ML models
-Quick training script for SVM, MLP, Random Forest, etc.
+Standalone training script for SVM, MLP, Random Forest, etc.
 """
 
-from emotion_recognition import EmotionRecognizer
 from data_extractor import load_data
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import os
+import pickle
 
 print("="*70)
 print("TRADITIONAL ML MODEL TRAINING")
@@ -30,8 +32,11 @@ if MODEL_TYPE == 'MLP':
         hidden_layer_sizes=(300,),
         activation='relu',
         solver='adam',
-        alpha=0.0001,
+        alpha=0.001,  # Increased regularization (was 0.0001)
         max_iter=500,
+        early_stopping=True,  # Stop when validation score stops improving
+        validation_fraction=0.1,
+        n_iter_no_change=10,
         random_state=42,
         verbose=True
     )
@@ -39,15 +44,18 @@ elif MODEL_TYPE == 'SVM':
     model = SVC(
         kernel='rbf',
         gamma='scale',
-        C=1.0,
+        C=1.0,  # Regularization parameter (lower = more regularization)
+        probability=True,  # Enable probability predictions
         random_state=42,
         verbose=True
     )
 elif MODEL_TYPE == 'RandomForest':
     model = RandomForestClassifier(
         n_estimators=100,
-        max_depth=None,
-        min_samples_split=2,
+        max_depth=15,  # Limit tree depth to reduce overfitting
+        min_samples_split=5,  # Increased from 2
+        min_samples_leaf=2,  # Minimum samples in leaf nodes
+        max_features='sqrt',  # Reduce features per split
         random_state=42,
         verbose=1,
         n_jobs=-1
@@ -57,17 +65,22 @@ elif MODEL_TYPE == 'GradientBoosting':
         n_estimators=100,
         learning_rate=0.1,
         max_depth=3,
+        min_samples_split=5,  # Increased regularization
+        subsample=0.8,  # Use 80% of samples for each tree
         random_state=42,
         verbose=1
     )
 elif MODEL_TYPE == 'KNN':
     model = KNeighborsClassifier(
-        n_neighbors=5,
+        n_neighbors=7,  # Increased from 5 for smoother decision boundary
         weights='distance',
+        metric='manhattan',  # Try manhattan distance
         n_jobs=-1
     )
 else:
     raise ValueError(f"Unknown model type: {MODEL_TYPE}")
+
+print(f"  {MODEL_TYPE} model created successfully")
 
 # Load data from 4-class CSV files
 print(f"\n[2/5] Loading and extracting features...")
@@ -87,36 +100,20 @@ print(f"\n  Training samples: {len(X_train)}")
 print(f"  Test samples: {len(X_test)}")
 print(f"  Feature dimensions: {X_train.shape[1]}")
 
-# Create recognizer with the model
-print(f"\n[3/5] Creating recognizer with {MODEL_TYPE}...")
-rec = EmotionRecognizer(
-    model=model,
-    emotions=EMOTIONS,
-    use_ravdess=False,  # Disable auto-loading since we loaded manually
-    use_tess=False,
-    use_hindi=False,
-    balance=True,
-    verbose=1
-)
-
-# Manually set the loaded data
-rec.X_train = X_train
-rec.y_train = y_train
-rec.X_test = X_test
-rec.y_test = y_test
-
 # Scale the data
-rec.X_train = rec.scaler.fit_transform(rec.X_train)
-rec.X_test = rec.scaler.transform(rec.X_test)
+print(f"\n[3/5] Scaling features...")
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
 # Train
 print(f"\n[4/5] Training {MODEL_TYPE} model...")
-rec.train()
+model.fit(X_train, y_train)
 
 # Evaluate
 print(f"\n[5/5] Evaluating model...")
-train_acc = rec.train_score()
-test_acc = rec.test_score()
+train_acc = accuracy_score(y_train, model.predict(X_train))
+test_acc = accuracy_score(y_test, model.predict(X_test))
 
 print("\n" + "="*70)
 print("RESULTS")
@@ -124,37 +121,80 @@ print("="*70)
 print(f"  Training Accuracy: {train_acc:.2%}")
 print(f"  Test Accuracy: {test_acc:.2%}")
 
+# Check for overfitting
+print("\n[Overfitting Check]")
+gap = train_acc - test_acc
+if gap > 0.15:  # More than 15% gap
+    print(f"⚠ WARNING: Possible overfitting detected!")
+    print(f"   Train-Test gap: {gap:.2%}")
+    print(f"   Consider: reducing model complexity or adding regularization")
+elif gap > 0.10:  # 10-15% gap
+    print(f"ℹ Moderate train-test gap: {gap:.2%}")
+    print(f"   Model may be slightly overfitting")
+else:
+    print(f"✓ Good generalization (gap: {gap:.2%})")
+
+# Get predictions
+y_pred = model.predict(X_test)
+
 # Confusion matrix
 print("\n[Confusion Matrix]")
-cm = rec.confusion_matrix()
-print(cm)
+cm = confusion_matrix(y_test, y_pred, labels=EMOTIONS)
+
+print(f"\n{'':>12}", end='')
+for emotion in EMOTIONS:
+    print(f"{emotion:>10}", end='')
+print()
+print("-"*70)
+for i, emotion in enumerate(EMOTIONS):
+    print(f"{emotion:>12}", end='')
+    for j in range(len(EMOTIONS)):
+        print(f"{cm[i][j]:>10}", end='')
+    print()
 
 # Classification report
 print("\n[Classification Report]")
-from sklearn.metrics import classification_report, accuracy_score
-y_pred = rec.predict_batch(rec.X_test)
-print(classification_report(rec.y_test, y_pred, target_names=EMOTIONS))
+print(classification_report(y_test, y_pred, target_names=EMOTIONS))
 
 # Save model
 os.makedirs('models', exist_ok=True)
 model_path = f'models/{MODEL_TYPE.lower()}_4emotions.pkl'
-rec.save_model(model_path)
+
+with open(model_path, 'wb') as f:
+    pickle.dump({
+        'model': model,
+        'scaler': scaler,
+        'emotions': EMOTIONS
+    }, f)
+
 print(f"\nModel saved to: {model_path}")
 
 print("\n" + "="*70)
 print("USAGE - Making predictions:")
 print("="*70)
-print(f"from emotion_recognition import EmotionRecognizer")
+print(f"from utils import extract_feature")
+print(f"import pickle")
 print(f"")
-print(f"rec = EmotionRecognizer(emotions={EMOTIONS})")
-print(f"rec.load_model('{model_path}')")
+print(f"# Load model")
+print(f"with open('{model_path}', 'rb') as f:")
+print(f"    data = pickle.load(f)")
+print(f"    model = data['model']")
+print(f"    scaler = data['scaler']")
+print(f"    emotions = data['emotions']")
 print(f"")
-print(f"# Single prediction")
-print(f"emotion = rec.predict('path/to/audio.wav')")
+print(f"# Extract features from audio")
+print(f"features = extract_feature('path/to/audio.wav',")
+print(f"                          mfcc=True, chroma=True, mel=True)")
+print(f"")
+print(f"# Scale and predict")
+print(f"features_scaled = scaler.transform([features])")
+print(f"emotion = model.predict(features_scaled)[0]")
+print(f"")
 print(f"print(f'Emotion: {{emotion}}')")
 print(f"")
-print(f"# Prediction with probabilities")
-print(f"probs = rec.predict_proba('path/to/audio.wav')")
-print(f"for emotion, prob in probs.items():")
-print(f"    print(f'{{emotion}}: {{prob:.2%}}')")
+print(f"# With probabilities (if model supports it)")
+print(f"if hasattr(model, 'predict_proba'):")
+print(f"    proba = model.predict_proba(features_scaled)[0]")
+print(f"    for emotion, prob in zip(emotions, proba):")
+print(f"        print(f'{{emotion}}: {{prob:.2%}}')")
 print("="*70)
