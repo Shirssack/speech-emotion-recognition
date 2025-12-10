@@ -151,11 +151,42 @@ class EmotionRecognizer:
         
         train_csvs = [c for c in train_csvs if os.path.exists(c)]
         test_csvs = [c for c in test_csvs if os.path.exists(c)]
-        
+
         if not train_csvs:
+            error_message = (
+                "\n" + "=" * 70 + "\n"
+                "ERROR: No dataset found!\n"
+                "=" * 70 + "\n"
+                "\nThe system could not find any audio dataset files.\n"
+                "\nPossible reasons:\n"
+                "  1. Datasets not downloaded (RAVDESS, TESS)\n"
+                "  2. Datasets in wrong folder location\n"
+                "  3. Incorrect folder structure\n"
+                "\nQuick fix:\n"
+                "  1. Run: python validate_datasets.py\n"
+                "  2. Run: python setup_datasets.py\n"
+                "  3. See: DATASET_SETUP_GUIDE.md for detailed instructions\n"
+                "\nRequired datasets:\n"
+                "  • RAVDESS: https://zenodo.org/record/1188976\n"
+                "  • TESS: https://doi.org/10.5683/SP2/E8H2MF\n"
+                "\nExpected structure:\n"
+                "  data/\n"
+                "  ├── ravdess/\n"
+                "  │   ├── Actor_01/\n"
+                "  │   └── ...\n"
+                "  └── tess/\n"
+                "      ├── OAF_angry/\n"
+                "      └── ...\n"
+                "\n" + "=" * 70 + "\n"
+            )
+
             if self.verbose:
-                print("No dataset found. Please add data to the 'data' folder.")
-            return
+                print(error_message)
+
+            raise FileNotFoundError(
+                "No dataset found. Please add data to the 'data' folder or provide "
+                "the correct data_path. Run 'python validate_datasets.py' for help."
+            )
         
         extractor = AudioExtractor(
             audio_config=self.audio_config,
