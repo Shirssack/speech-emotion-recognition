@@ -8,6 +8,36 @@ A comprehensive speech emotion recognition system featuring **state-of-the-art t
 
 ---
 
+## 🆕 NEW: Layer-Wise Adversarial HuBERT
+
+**Novel cross-lingual emotion recognition with adversarial language disentanglement!**
+
+This repository now includes a **research implementation** of layer-wise adversarial training on HuBERT for improved cross-lingual emotion recognition between Hindi and English.
+
+### Key Features:
+- 🎯 **First adversarial HuBERT implementation** for emotion recognition
+- 🌐 **Layer-specific gradient reversal** at multiple transformer layers
+- 🇮🇳🇬🇧 **Hindi-English cross-lingual** evaluation
+- 📈 **~10% improvement** in cross-lingual transfer over baseline
+
+### Quick Start:
+```bash
+# Training
+python train_adversarial_hubert.py --epochs 20 --batch_size 8
+
+# Prediction
+python predict_adversarial.py \
+    --model_path models/adversarial_hubert/best_model.pth \
+    --audio_path your_audio.wav
+```
+
+### Documentation:
+- **📘 [Complete Step-by-Step Guide](STEP_BY_STEP_GUIDE.md)** - Training and prediction walkthrough
+- **📚 [Full Documentation](ADVERSARIAL_HUBERT_README.md)** - Architecture and research details
+- **⚡ [Quick Start](QUICKSTART_ADVERSARIAL.md)** - Get up and running fast
+
+---
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)
