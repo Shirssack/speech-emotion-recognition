@@ -32,8 +32,6 @@ from sklearn.metrics import (
     accuracy_score, f1_score, classification_report,
     confusion_matrix
 )
-import matplotlib.pyplot as plt
-import seaborn as sns
 from transformers import Wav2Vec2FeatureExtractor
 
 from adversarial_hubert_emotion import LayerWiseAdversarialHuBERT
@@ -52,6 +50,15 @@ def plot_confusion_matrix(
     save_path: Path
 ):
     """Plot and save confusion matrix"""
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError as exc:
+        raise ImportError(
+            "matplotlib and seaborn are required for plotting. Install them via"
+            " `pip install matplotlib seaborn` or include them from requirements.txt."
+        ) from exc
+
     cm = confusion_matrix(y_true, y_pred)
     cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 

@@ -82,6 +82,10 @@ class EmotionDataset(Dataset):
             audio_path = self.audio_paths[idx]
             speech, sr = sf.read(audio_path)
 
+            # Convert to mono if needed
+            if speech.ndim > 1:
+                speech = speech.mean(axis=1)
+
             # Resample if needed
             if sr != self.sampling_rate:
                 # Simple resampling (for production, use librosa.resample)
@@ -120,15 +124,28 @@ class EmotionDataset(Dataset):
             }
 
 
-def _validate_audio_file(audio_path: str) -> Tuple[bool, str]:
-    """Lightweight check to ensure an audio file exists and is readable."""
+def _validate_audio_file(audio_path: str, sampling_rate: int = 16000) -> Tuple[bool, str]:
+    """Check that an audio file can be fully read and contains valid samples."""
     if not os.path.exists(audio_path):
         return False, "missing file"
 
     try:
-        with sf.SoundFile(audio_path) as f:
-            if f.frames == 0:
-                return False, "empty audio"
+        speech, sr = sf.read(audio_path)
+        if speech.size == 0:
+            return False, "empty audio"
+
+        # Convert to mono to mirror model preprocessing expectations
+        if speech.ndim > 1:
+            speech = speech.mean(axis=1)
+
+        # Basic sanity checks before training
+        if not np.isfinite(speech).all():
+            return False, "non-finite samples"
+
+        # Ensure downstream resampling won't fail on pathological sample rates
+        if sr <= 0:
+            return False, f"invalid sample rate {sr}"
+
     except Exception as e:
         return False, str(e)
 
@@ -138,7 +155,8 @@ def _validate_audio_file(audio_path: str) -> Tuple[bool, str]:
 def load_data_with_language_labels(
     csv_files: List[str],
     emotion_to_id: Dict[str, int],
-    language_name: str
+    language_name: str,
+    sampling_rate: int = 16000
 ) -> Tuple[List[str], List[int], List[int]]:
     """
     Load data from CSV files with language labels
@@ -173,7 +191,7 @@ def load_data_with_language_labels(
                 continue
 
             audio_path = row['path']
-            is_valid, reason = _validate_audio_file(audio_path)
+            is_valid, reason = _validate_audio_file(audio_path, sampling_rate=sampling_rate)
             if not is_valid:
                 skipped_paths.append((audio_path, reason))
                 continue
