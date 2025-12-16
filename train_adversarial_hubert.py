@@ -18,6 +18,7 @@ import os
 import sys
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import warnings
@@ -119,6 +120,21 @@ class EmotionDataset(Dataset):
             }
 
 
+def _validate_audio_file(audio_path: str) -> Tuple[bool, str]:
+    """Lightweight check to ensure an audio file exists and is readable."""
+    if not os.path.exists(audio_path):
+        return False, "missing file"
+
+    try:
+        with sf.SoundFile(audio_path) as f:
+            if f.frames == 0:
+                return False, "empty audio"
+    except Exception as e:
+        return False, str(e)
+
+    return True, ""
+
+
 def load_data_with_language_labels(
     csv_files: List[str],
     emotion_to_id: Dict[str, int],
@@ -133,15 +149,16 @@ def load_data_with_language_labels(
         language_name: Language name ("english" or "hindi")
 
     Returns:
-        audio_paths: List of audio file paths
+        audio_paths: List of audio file paths (validated)
         emotion_labels: List of emotion IDs
         language_labels: List of language IDs
     """
     language_id = 0 if language_name.lower() == "english" else 1
 
-    audio_paths = []
-    emotion_labels = []
-    language_labels = []
+    audio_paths: List[str] = []
+    emotion_labels: List[int] = []
+    language_labels: List[int] = []
+    skipped_paths: List[Tuple[str, str]] = []
 
     for csv_file in csv_files:
         if not os.path.exists(csv_file):
@@ -152,12 +169,32 @@ def load_data_with_language_labels(
 
         for _, row in df.iterrows():
             emotion = row['emotion'].lower()
-            if emotion in emotion_to_id:
-                audio_paths.append(row['path'])
-                emotion_labels.append(emotion_to_id[emotion])
-                language_labels.append(language_id)
+            if emotion not in emotion_to_id:
+                continue
+
+            audio_path = row['path']
+            is_valid, reason = _validate_audio_file(audio_path)
+            if not is_valid:
+                skipped_paths.append((audio_path, reason))
+                continue
+
+            audio_paths.append(audio_path)
+            emotion_labels.append(emotion_to_id[emotion])
+            language_labels.append(language_id)
 
         print(f"  Loaded {len(df)} samples from {csv_file} ({language_name})")
+
+    if skipped_paths:
+        reason_counts = Counter(reason for _, reason in skipped_paths)
+        total_skipped = len(skipped_paths)
+        print(f"  Skipped {total_skipped} {language_name} samples that could not be read:")
+        for reason, count in reason_counts.most_common():
+            print(f"    - {reason}: {count}")
+
+        example_paths = skipped_paths[:5]
+        print("  Example problematic files:")
+        for path, reason in example_paths:
+            print(f"    {reason} -> {path}")
 
     return audio_paths, emotion_labels, language_labels
 
