@@ -32,7 +32,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
 import soundfile as sf
-from transformers import Wav2Vec2Processor
+from transformers import Wav2Vec2FeatureExtractor
 
 from adversarial_hubert_emotion import (
     LayerWiseAdversarialHuBERT,
@@ -59,7 +59,7 @@ class EmotionDataset(Dataset):
         audio_paths: List[str],
         emotion_labels: List[int],
         language_labels: List[int],
-        processor: Wav2Vec2Processor,
+        processor: Wav2Vec2FeatureExtractor,
         max_duration: float = 5.0,
         sampling_rate: int = 16000
     ):
@@ -171,7 +171,7 @@ def create_dataloaders(
     test_labels_en: List[int],
     test_paths_hi: List[str],
     test_labels_hi: List[int],
-    processor: Wav2Vec2Processor,
+    processor: Wav2Vec2FeatureExtractor,
     batch_size: int,
     max_duration: float,
     num_workers: int = 4
@@ -456,7 +456,7 @@ def main():
     # Model arguments
     parser.add_argument('--model_name', type=str,
                         default='facebook/hubert-base-ls960',
-                        help='HuBERT model name')
+                        help='HuBERT model name (feature extractor only; no tokenizer needed)')
     parser.add_argument('--adversarial_layers', nargs='+', type=int,
                         default=[3, 6, 9, 12],
                         help='Layers for gradient reversal')
@@ -570,7 +570,7 @@ def main():
     print(f"\n{'='*80}")
     print("Loading Processor")
     print(f"{'='*80}")
-    processor = Wav2Vec2Processor.from_pretrained(args.model_name)
+    processor = Wav2Vec2FeatureExtractor.from_pretrained(args.model_name)
 
     # Create dataloaders
     print(f"\n{'='*80}")
