@@ -106,14 +106,22 @@ scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
+# Encode labels to integers (required for early_stopping and some models)
+print(f"  Encoding labels...")
+emotion_to_int = {e: i for i, e in enumerate(EMOTIONS)}
+int_to_emotion = {i: e for e, i in emotion_to_int.items()}
+
+y_train_encoded = [emotion_to_int[label] for label in y_train]
+y_test_encoded = [emotion_to_int[label] for label in y_test]
+
 # Train
 print(f"\n[4/5] Training {MODEL_TYPE} model...")
-model.fit(X_train, y_train)
+model.fit(X_train, y_train_encoded)
 
 # Evaluate
 print(f"\n[5/5] Evaluating model...")
-train_acc = accuracy_score(y_train, model.predict(X_train))
-test_acc = accuracy_score(y_test, model.predict(X_test))
+train_acc = accuracy_score(y_train_encoded, model.predict(X_train))
+test_acc = accuracy_score(y_test_encoded, model.predict(X_test))
 
 print("\n" + "="*70)
 print("RESULTS")
@@ -134,12 +142,14 @@ elif gap > 0.10:  # 10-15% gap
 else:
     print(f"✓ Good generalization (gap: {gap:.2%})")
 
-# Get predictions
-y_pred = model.predict(X_test)
+# Get predictions (decode integers back to emotion strings)
+y_pred_encoded = model.predict(X_test)
+y_pred = [int_to_emotion[pred] for pred in y_pred_encoded]
+y_test_labels = [int_to_emotion[label] for label in y_test_encoded]
 
 # Confusion matrix
 print("\n[Confusion Matrix]")
-cm = confusion_matrix(y_test, y_pred, labels=EMOTIONS)
+cm = confusion_matrix(y_test_labels, y_pred, labels=EMOTIONS)
 
 print(f"\n{'':>12}", end='')
 for emotion in EMOTIONS:
@@ -154,7 +164,7 @@ for i, emotion in enumerate(EMOTIONS):
 
 # Classification report
 print("\n[Classification Report]")
-print(classification_report(y_test, y_pred, target_names=EMOTIONS))
+print(classification_report(y_test_labels, y_pred, target_names=EMOTIONS))
 
 # Save model
 os.makedirs('models', exist_ok=True)
@@ -164,7 +174,9 @@ with open(model_path, 'wb') as f:
     pickle.dump({
         'model': model,
         'scaler': scaler,
-        'emotions': EMOTIONS
+        'emotions': EMOTIONS,
+        'emotion_to_int': emotion_to_int,
+        'int_to_emotion': int_to_emotion
     }, f)
 
 print(f"\nModel saved to: {model_path}")
@@ -181,6 +193,7 @@ print(f"    data = pickle.load(f)")
 print(f"    model = data['model']")
 print(f"    scaler = data['scaler']")
 print(f"    emotions = data['emotions']")
+print(f"    int_to_emotion = data['int_to_emotion']")
 print(f"")
 print(f"# Extract features from audio")
 print(f"features = extract_feature('path/to/audio.wav',")
@@ -188,13 +201,14 @@ print(f"                          mfcc=True, chroma=True, mel=True)")
 print(f"")
 print(f"# Scale and predict")
 print(f"features_scaled = scaler.transform([features])")
-print(f"emotion = model.predict(features_scaled)[0]")
+print(f"emotion_idx = model.predict(features_scaled)[0]")
+print(f"emotion = int_to_emotion[emotion_idx]")
 print(f"")
 print(f"print(f'Emotion: {{emotion}}')")
 print(f"")
 print(f"# With probabilities (if model supports it)")
 print(f"if hasattr(model, 'predict_proba'):")
 print(f"    proba = model.predict_proba(features_scaled)[0]")
-print(f"    for emotion, prob in zip(emotions, proba):")
-print(f"        print(f'{{emotion}}: {{prob:.2%}}')")
+print(f"    for idx, prob in enumerate(proba):")
+print(f"        print(f'{{int_to_emotion[idx]}}: {{prob:.2%}}')")
 print("="*70)
