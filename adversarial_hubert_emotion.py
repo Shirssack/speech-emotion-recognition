@@ -278,6 +278,26 @@ class LayerWiseAdversarialHuBERT(nn.Module):
         print(f"Gradient Checkpointing: {gradient_checkpointing}")
         print(f"{'='*70}\n")
 
+    def _build_feature_attention_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
+        """Convert sample-level padding mask to feature-level mask.
+
+        HuBERT reduces the temporal resolution of the input by the CNN feature
+        extractor. Pooling hidden states therefore requires an attention mask
+        that matches the hidden-state sequence length instead of the raw audio
+        length. This helper projects the sample-level mask to the hidden-state
+        domain using the model's internal length computation.
+        """
+        # attention_mask is shape [batch, num_samples]; sum gives valid samples
+        sample_lengths = attention_mask.sum(dim=1)
+        feature_lengths = self.hubert._get_feat_extract_output_lengths(sample_lengths)
+
+        max_feature_len = int(feature_lengths.max().item())
+        range_row = torch.arange(max_feature_len, device=attention_mask.device)
+
+        # Broadcast compare to create [batch, max_feature_len] boolean mask
+        feature_mask = (range_row.unsqueeze(0) < feature_lengths.unsqueeze(1)).float()
+        return feature_mask
+
     def get_layer_representations(
         self,
         input_values: torch.Tensor,
@@ -306,6 +326,10 @@ class LayerWiseAdversarialHuBERT(nn.Module):
         # hidden_states[0] = embeddings, hidden_states[1-12] = transformer layers
         all_hidden_states = outputs.hidden_states
 
+        feature_mask = None
+        if attention_mask is not None:
+            feature_mask = self._build_feature_attention_mask(attention_mask)
+
         # Collect representations at specified adversarial layers
         layer_representations = []
         for layer_idx in self.adversarial_layers:
@@ -313,9 +337,9 @@ class LayerWiseAdversarialHuBERT(nn.Module):
             layer_output = all_hidden_states[layer_idx]  # [batch, seq_len, feature_dim]
 
             # Mean pooling over time dimension
-            if attention_mask is not None:
+            if feature_mask is not None:
                 # Mask padding tokens
-                mask_expanded = attention_mask.unsqueeze(-1).expand(layer_output.size()).float()
+                mask_expanded = feature_mask.unsqueeze(-1).expand(layer_output.size())
                 sum_embeddings = torch.sum(layer_output * mask_expanded, dim=1)
                 sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
                 pooled = sum_embeddings / sum_mask
@@ -328,8 +352,8 @@ class LayerWiseAdversarialHuBERT(nn.Module):
         final_hidden_state = outputs.last_hidden_state  # [batch, seq_len, feature_dim]
 
         # Mean pooling for final representation
-        if attention_mask is not None:
-            mask_expanded = attention_mask.unsqueeze(-1).expand(final_hidden_state.size()).float()
+        if feature_mask is not None:
+            mask_expanded = feature_mask.unsqueeze(-1).expand(final_hidden_state.size())
             sum_embeddings = torch.sum(final_hidden_state * mask_expanded, dim=1)
             sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
             final_representation = sum_embeddings / sum_mask

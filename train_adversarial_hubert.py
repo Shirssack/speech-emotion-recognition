@@ -18,6 +18,7 @@ import os
 import sys
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import warnings
@@ -32,7 +33,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
 import soundfile as sf
-from transformers import Wav2Vec2Processor
+from transformers import Wav2Vec2FeatureExtractor
 
 from adversarial_hubert_emotion import (
     LayerWiseAdversarialHuBERT,
@@ -59,7 +60,7 @@ class EmotionDataset(Dataset):
         audio_paths: List[str],
         emotion_labels: List[int],
         language_labels: List[int],
-        processor: Wav2Vec2Processor,
+        processor: Wav2Vec2FeatureExtractor,
         max_duration: float = 5.0,
         sampling_rate: int = 16000
     ):
@@ -80,6 +81,10 @@ class EmotionDataset(Dataset):
             # Load audio
             audio_path = self.audio_paths[idx]
             speech, sr = sf.read(audio_path)
+
+            # Convert to mono if needed
+            if speech.ndim > 1:
+                speech = speech.mean(axis=1)
 
             # Resample if needed
             if sr != self.sampling_rate:
@@ -119,10 +124,39 @@ class EmotionDataset(Dataset):
             }
 
 
+def _validate_audio_file(audio_path: str, sampling_rate: int = 16000) -> Tuple[bool, str]:
+    """Check that an audio file can be fully read and contains valid samples."""
+    if not os.path.exists(audio_path):
+        return False, "missing file"
+
+    try:
+        speech, sr = sf.read(audio_path)
+        if speech.size == 0:
+            return False, "empty audio"
+
+        # Convert to mono to mirror model preprocessing expectations
+        if speech.ndim > 1:
+            speech = speech.mean(axis=1)
+
+        # Basic sanity checks before training
+        if not np.isfinite(speech).all():
+            return False, "non-finite samples"
+
+        # Ensure downstream resampling won't fail on pathological sample rates
+        if sr <= 0:
+            return False, f"invalid sample rate {sr}"
+
+    except Exception as e:
+        return False, str(e)
+
+    return True, ""
+
+
 def load_data_with_language_labels(
     csv_files: List[str],
     emotion_to_id: Dict[str, int],
-    language_name: str
+    language_name: str,
+    sampling_rate: int = 16000
 ) -> Tuple[List[str], List[int], List[int]]:
     """
     Load data from CSV files with language labels
@@ -133,15 +167,16 @@ def load_data_with_language_labels(
         language_name: Language name ("english" or "hindi")
 
     Returns:
-        audio_paths: List of audio file paths
+        audio_paths: List of audio file paths (validated)
         emotion_labels: List of emotion IDs
         language_labels: List of language IDs
     """
     language_id = 0 if language_name.lower() == "english" else 1
 
-    audio_paths = []
-    emotion_labels = []
-    language_labels = []
+    audio_paths: List[str] = []
+    emotion_labels: List[int] = []
+    language_labels: List[int] = []
+    skipped_paths: List[Tuple[str, str]] = []
 
     for csv_file in csv_files:
         if not os.path.exists(csv_file):
@@ -152,12 +187,32 @@ def load_data_with_language_labels(
 
         for _, row in df.iterrows():
             emotion = row['emotion'].lower()
-            if emotion in emotion_to_id:
-                audio_paths.append(row['path'])
-                emotion_labels.append(emotion_to_id[emotion])
-                language_labels.append(language_id)
+            if emotion not in emotion_to_id:
+                continue
+
+            audio_path = row['path']
+            is_valid, reason = _validate_audio_file(audio_path, sampling_rate=sampling_rate)
+            if not is_valid:
+                skipped_paths.append((audio_path, reason))
+                continue
+
+            audio_paths.append(audio_path)
+            emotion_labels.append(emotion_to_id[emotion])
+            language_labels.append(language_id)
 
         print(f"  Loaded {len(df)} samples from {csv_file} ({language_name})")
+
+    if skipped_paths:
+        reason_counts = Counter(reason for _, reason in skipped_paths)
+        total_skipped = len(skipped_paths)
+        print(f"  Skipped {total_skipped} {language_name} samples that could not be read:")
+        for reason, count in reason_counts.most_common():
+            print(f"    - {reason}: {count}")
+
+        example_paths = skipped_paths[:5]
+        print("  Example problematic files:")
+        for path, reason in example_paths:
+            print(f"    {reason} -> {path}")
 
     return audio_paths, emotion_labels, language_labels
 
@@ -171,7 +226,7 @@ def create_dataloaders(
     test_labels_en: List[int],
     test_paths_hi: List[str],
     test_labels_hi: List[int],
-    processor: Wav2Vec2Processor,
+    processor: Wav2Vec2FeatureExtractor,
     batch_size: int,
     max_duration: float,
     num_workers: int = 4
@@ -456,7 +511,7 @@ def main():
     # Model arguments
     parser.add_argument('--model_name', type=str,
                         default='facebook/hubert-base-ls960',
-                        help='HuBERT model name')
+                        help='HuBERT model name (feature extractor only; no tokenizer needed)')
     parser.add_argument('--adversarial_layers', nargs='+', type=int,
                         default=[3, 6, 9, 12],
                         help='Layers for gradient reversal')
@@ -570,7 +625,7 @@ def main():
     print(f"\n{'='*80}")
     print("Loading Processor")
     print(f"{'='*80}")
-    processor = Wav2Vec2Processor.from_pretrained(args.model_name)
+    processor = Wav2Vec2FeatureExtractor.from_pretrained(args.model_name)
 
     # Create dataloaders
     print(f"\n{'='*80}")
