@@ -34,7 +34,7 @@ from sklearn.metrics import (
 )
 import matplotlib.pyplot as plt
 import seaborn as sns
-from transformers import Wav2Vec2Processor
+from transformers import Wav2Vec2FeatureExtractor
 
 from adversarial_hubert_emotion import LayerWiseAdversarialHuBERT
 from train_adversarial_hubert import (
@@ -77,7 +77,7 @@ def plot_confusion_matrix(
 
 def evaluate_cross_lingual_transfer(
     model: nn.Module,
-    processor: Wav2Vec2Processor,
+    processor: Wav2Vec2FeatureExtractor,
     train_paths: List[str],
     train_labels: List[int],
     test_paths_same: List[str],
@@ -332,8 +332,8 @@ def main():
     print(f"Model loaded successfully!")
     print(f"Emotions: {list(emotion_to_id.keys())}")
 
-    # Load processor
-    processor = Wav2Vec2Processor.from_pretrained(config['model_name'])
+    # Load processor (feature extractor only; HuBERT has no tokenizer vocab)
+    processor = Wav2Vec2FeatureExtractor.from_pretrained(config['model_name'])
 
     # Load data
     print(f"\n{'='*80}")
